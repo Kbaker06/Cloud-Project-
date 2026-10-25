@@ -32,8 +32,11 @@ def public_access_block(ctx: Context, _region: str):
             missing = ["all four settings"]
         if missing:
             yield Finding(
-                "S3-001", "Bucket Block Public Access not fully enabled", Severity.HIGH,
-                f"arn:aws:s3:::{name}", GLOBAL,
+                "S3-001",
+                "Bucket Block Public Access not fully enabled",
+                Severity.HIGH,
+                f"arn:aws:s3:::{name}",
+                GLOBAL,
                 f"Disabled: {', '.join(missing)}",
                 f"aws s3api put-public-access-block --bucket {name} --public-access-block-configuration "
                 "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true",
@@ -63,8 +66,11 @@ def public_policy(ctx: Context, _region: str):
             is_everyone = principal == "*" or (isinstance(principal, dict) and "*" in _as_list(principal.get("AWS", [])))
             if stmt.get("Effect") == "Allow" and is_everyone and not stmt.get("Condition"):
                 yield Finding(
-                    "S3-002", "Bucket policy grants access to everyone", Severity.CRITICAL,
-                    f"arn:aws:s3:::{b['Name']}", GLOBAL,
+                    "S3-002",
+                    "Bucket policy grants access to everyone",
+                    Severity.CRITICAL,
+                    f"arn:aws:s3:::{b['Name']}",
+                    GLOBAL,
                     f"Statement {stmt.get('Sid', '(no Sid)')} allows {stmt.get('Action')} to Principal '*' with no condition",
                     "Remove the statement or scope it with a Condition (aws:SourceVpce, aws:PrincipalOrgID, ...). "
                     "Serve public content through CloudFront with Origin Access Control instead.",
@@ -84,8 +90,11 @@ def tls_only(ctx: Context, _region: str):
         )
         if not enforced:
             yield Finding(
-                "S3-003", "Bucket policy does not enforce TLS", Severity.LOW,
-                f"arn:aws:s3:::{b['Name']}", GLOBAL,
+                "S3-003",
+                "Bucket policy does not enforce TLS",
+                Severity.LOW,
+                f"arn:aws:s3:::{b['Name']}",
+                GLOBAL,
                 "No Deny statement on aws:SecureTransport=false; plaintext HTTP requests are accepted.",
                 "Add a Deny s3:* statement with Condition Bool aws:SecureTransport = false.",
             )
@@ -98,8 +107,11 @@ def versioning(ctx: Context, _region: str):
         status = s3.get_bucket_versioning(Bucket=b["Name"]).get("Status")
         if status != "Enabled":
             yield Finding(
-                "S3-004", "Bucket versioning disabled", Severity.MEDIUM,
-                f"arn:aws:s3:::{b['Name']}", GLOBAL,
+                "S3-004",
+                "Bucket versioning disabled",
+                Severity.MEDIUM,
+                f"arn:aws:s3:::{b['Name']}",
+                GLOBAL,
                 f"Versioning is {status or 'never enabled'}: an overwrite, delete or ransomware encryption is unrecoverable.",
                 f"aws s3api put-bucket-versioning --bucket {b['Name']} --versioning-configuration Status=Enabled "
                 "(and add a lifecycle rule to expire old versions).",

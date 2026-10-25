@@ -110,11 +110,30 @@ resource "aws_vpc_security_group_ingress_rule" "from_alb" {
   referenced_security_group_id = var.alb_security_group_id
 }
 
-resource "aws_vpc_security_group_egress_rule" "all" {
+data "aws_vpc" "this" {
+  id = var.vpc_id
+}
+
+# Egress is HTTPS-out (image pulls, AWS APIs via NAT or endpoints) plus Postgres inside the VPC.
+# DNS goes to the VPC resolver, which security groups don't filter.
+resource "aws_vpc_security_group_egress_rule" "https" {
   security_group_id = aws_security_group.service.id
-  description       = "Outbound (image pulls, AWS APIs, database)"
-  ip_protocol       = "-1"
+  description       = "HTTPS to registries and AWS APIs"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
   cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "in_vpc" {
+  for_each = toset([for p in var.egress_ports_in_vpc : tostring(p)])
+
+  security_group_id = aws_security_group.service.id
+  description       = "TCP ${each.value} inside the VPC"
+  ip_protocol       = "tcp"
+  from_port         = tonumber(each.value)
+  to_port           = tonumber(each.value)
+  cidr_ipv4         = data.aws_vpc.this.cidr_block
 }
 
 resource "aws_lb_target_group" "this" {

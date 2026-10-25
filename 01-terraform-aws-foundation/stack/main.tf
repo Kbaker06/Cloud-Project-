@@ -29,16 +29,18 @@ module "alb" {
   tags                = local.tags
 }
 
-resource "aws_sns_topic" "alarms" {
-  name              = "${local.name}-alarms"
-  kms_master_key_id = "alias/aws/sns"
-  tags              = local.tags
+module "alarms_topic" {
+  source = "../modules/sns-topic"
+
+  name               = "${local.name}-alarms"
+  publisher_services = ["cloudwatch.amazonaws.com"]
+  tags               = local.tags
 }
 
 resource "aws_sns_topic_subscription" "alarm_email" {
   count = var.alarm_email == null ? 0 : 1
 
-  topic_arn = aws_sns_topic.alarms.arn
+  topic_arn = module.alarms_topic.arn
   protocol  = "email"
   endpoint  = var.alarm_email
 }
@@ -75,7 +77,7 @@ module "app" {
   }
 
   enable_alarms          = true
-  alarm_sns_topic_arn    = aws_sns_topic.alarms.arn
+  alarm_sns_topic_arn    = module.alarms_topic.arn
   enable_execute_command = var.environment != "prod"
   tags                   = local.tags
 }

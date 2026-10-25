@@ -5,8 +5,16 @@ from ..registry import Context, check
 
 # Ports that should never be open to the whole internet.
 SENSITIVE_PORTS = {
-    22: "SSH", 3389: "RDP", 3306: "MySQL", 5432: "PostgreSQL", 1433: "MSSQL",
-    6379: "Redis", 27017: "MongoDB", 9200: "Elasticsearch", 2375: "Docker API", 23: "Telnet",
+    22: "SSH",
+    3389: "RDP",
+    3306: "MySQL",
+    5432: "PostgreSQL",
+    1433: "MSSQL",
+    6379: "Redis",
+    27017: "MongoDB",
+    9200: "Elasticsearch",
+    2375: "Docker API",
+    23: "Telnet",
 }
 OPEN_CIDRS = {"0.0.0.0/0", "::/0"}
 
@@ -37,9 +45,11 @@ def open_security_groups(ctx: Context, region: str):
             ports = _exposed_ports(perm)
             if ports:
                 yield Finding(
-                    "EC2-001", "Security group exposes sensitive ports to the internet",
+                    "EC2-001",
+                    "Security group exposes sensitive ports to the internet",
                     Severity.CRITICAL if "ALL TRAFFIC" in ports or "22/SSH" in ports or "3389/RDP" in ports else Severity.HIGH,
-                    sg["GroupId"], region,
+                    sg["GroupId"],
+                    region,
                     f"{sg.get('GroupName')} allows {', '.join(ports)} from {', '.join(sorted(cidrs & OPEN_CIDRS))}",
                     "Restrict the source to known CIDRs or security groups. For shell access use SSM Session Manager "
                     "and close port 22 entirely.",
@@ -52,7 +62,11 @@ def unencrypted_volumes(ctx: Context, region: str):
     for vol in _paginate(ec2, "describe_volumes", "Volumes"):
         if not vol.get("Encrypted"):
             yield Finding(
-                "EC2-002", "EBS volume is not encrypted", Severity.MEDIUM, vol["VolumeId"], region,
+                "EC2-002",
+                "EBS volume is not encrypted",
+                Severity.MEDIUM,
+                vol["VolumeId"],
+                region,
                 f"{vol.get('Size')} GiB {vol.get('VolumeType')} volume stored in plaintext.",
                 "Snapshot → copy snapshot with encryption → create volume → swap. Then enable EBS encryption by default.",
             )
@@ -62,7 +76,11 @@ def unencrypted_volumes(ctx: Context, region: str):
 def ebs_default_encryption(ctx: Context, region: str):
     if not ctx.client("ec2", region).get_ebs_encryption_by_default()["EbsEncryptionByDefault"]:
         yield Finding(
-            "EC2-003", "EBS encryption by default is disabled", Severity.LOW, f"region/{region}", region,
+            "EC2-003",
+            "EBS encryption by default is disabled",
+            Severity.LOW,
+            f"region/{region}",
+            region,
             "New volumes in this region will be unencrypted unless every launch remembers to ask.",
             f"aws ec2 enable-ebs-encryption-by-default --region {region}",
         )
@@ -77,7 +95,11 @@ def imdsv1(ctx: Context, region: str):
                 continue
             if inst.get("MetadataOptions", {}).get("HttpTokens") != "required":
                 yield Finding(
-                    "EC2-004", "Instance allows IMDSv1", Severity.HIGH, inst["InstanceId"], region,
+                    "EC2-004",
+                    "Instance allows IMDSv1",
+                    Severity.HIGH,
+                    inst["InstanceId"],
+                    region,
                     "IMDSv1 lets any SSRF bug in the app read the instance role's credentials (the Capital One breach pattern).",
                     f"aws ec2 modify-instance-metadata-options --instance-id {inst['InstanceId']} --http-tokens required",
                 )

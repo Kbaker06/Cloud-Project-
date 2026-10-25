@@ -15,7 +15,9 @@ def test_fully_blocked_bucket_passes(aws, ctx):
     s3.create_bucket(Bucket="locked")
     s3.put_public_access_block(
         Bucket="locked",
-        PublicAccessBlockConfiguration={k: True for k in ("BlockPublicAcls", "IgnorePublicAcls", "BlockPublicPolicy", "RestrictPublicBuckets")},
+        PublicAccessBlockConfiguration={
+            k: True for k in ("BlockPublicAcls", "IgnorePublicAcls", "BlockPublicPolicy", "RestrictPublicBuckets")
+        },
     )
     assert run("S3-001", ctx) == []
 
@@ -25,7 +27,12 @@ def test_partially_blocked_bucket_lists_missing_settings(aws, ctx):
     s3.create_bucket(Bucket="half")
     s3.put_public_access_block(
         Bucket="half",
-        PublicAccessBlockConfiguration={"BlockPublicAcls": True, "IgnorePublicAcls": True, "BlockPublicPolicy": False, "RestrictPublicBuckets": False},
+        PublicAccessBlockConfiguration={
+            "BlockPublicAcls": True,
+            "IgnorePublicAcls": True,
+            "BlockPublicPolicy": False,
+            "RestrictPublicBuckets": False,
+        },
     )
     [f] = run("S3-001", ctx)
     assert "BlockPublicPolicy" in f.detail and "RestrictPublicBuckets" in f.detail
@@ -40,7 +47,16 @@ def test_public_bucket_policy_is_critical(aws, ctx):
     s3.create_bucket(Bucket="website")
     s3.put_bucket_policy(
         Bucket="website",
-        Policy=_policy("website", {"Sid": "Public", "Effect": "Allow", "Principal": "*", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::website/*"}),
+        Policy=_policy(
+            "website",
+            {
+                "Sid": "Public",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::website/*",
+            },
+        ),
     )
     [f] = run("S3-002", ctx)
     assert f.severity.name == "CRITICAL"

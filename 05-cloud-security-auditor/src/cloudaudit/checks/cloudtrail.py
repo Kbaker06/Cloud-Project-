@@ -12,7 +12,11 @@ def multi_region_trail(ctx: Context, _region: str):
         if trail.get("IsMultiRegionTrail") and ct.get_trail_status(Name=trail["TrailARN"]).get("IsLogging"):
             return
     yield Finding(
-        "CT-001", "No multi-region CloudTrail trail is logging", Severity.HIGH, "cloudtrail", "global",
+        "CT-001",
+        "No multi-region CloudTrail trail is logging",
+        Severity.HIGH,
+        "cloudtrail",
+        "global",
         "Without an org/multi-region trail, API activity in unused regions (where attackers mine crypto) goes unrecorded "
         "beyond the 90-day event history.",
         "Create a multi-region trail with log file validation to a locked-down S3 bucket (ideally an org trail).",

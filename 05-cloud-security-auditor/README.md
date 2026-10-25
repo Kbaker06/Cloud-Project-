@@ -102,7 +102,7 @@ cloudaudit scan --format sarif -o cloudaudit.sarif              # for GitHub cod
 Run it with a **read-only** role. Never use admin credentials for an auditor:
 
 ```bash
-aws iam create-role --role-name cloudaudit --assume-role-policy-document file://trust.json
+aws iam create-role --role-name cloudaudit --assume-role-policy-document file://trust.json.example   # edit the account ID first
 aws iam attach-role-policy --role-name cloudaudit --policy-arn arn:aws:iam::aws:policy/SecurityAudit
 ```
 

@@ -7,8 +7,11 @@ from .models import ScanResult, Severity
 from .registry import all_checks
 
 _COLORS = {
-    Severity.CRITICAL: "\033[1;41m", Severity.HIGH: "\033[31m", Severity.MEDIUM: "\033[33m",
-    Severity.LOW: "\033[36m", Severity.INFO: "\033[2m",
+    Severity.CRITICAL: "\033[1;41m",
+    Severity.HIGH: "\033[31m",
+    Severity.MEDIUM: "\033[33m",
+    Severity.LOW: "\033[36m",
+    Severity.INFO: "\033[2m",
 }
 _RESET = "\033[0m"
 
@@ -27,16 +30,18 @@ def table(result: ScanResult, color: bool = True) -> str:
     widths = [min(max(len(r[i]) for r in rows), cap) for i, cap in enumerate((8, 8, 14, 60, 90))]
 
     def fmt(row, sev=None):
-        cells = [c if len(c) <= w else c[: w - 1] + "…" for c, w in zip(row, widths)]
-        line = "  ".join(c.ljust(w) for c, w in zip(cells, widths))
+        cells = [c if len(c) <= w else c[: w - 1] + "…" for c, w in zip(row, widths, strict=True)]
+        line = "  ".join(c.ljust(w) for c, w in zip(cells, widths, strict=True))
         return f"{_COLORS[sev]}{line}{_RESET}" if color and sev is not None else line
 
     out = [fmt(rows[0])]
-    out += [fmt(r, f.severity) for r, f in zip(rows[1:], result.sorted_findings())]
+    out += [fmt(r, f.severity) for r, f in zip(rows[1:], result.sorted_findings(), strict=True)]
     counts = " ".join(f"{k.lower()}={v}" for k, v in _summary_counts(result).items())
     out.append("")
-    out.append(f"account {result.account_id}: {len(result.findings)} findings ({counts}), "
-               f"{result.suppressed} suppressed by baseline, ~${result.wasted_monthly_usd}/month of waste")
+    out.append(
+        f"account {result.account_id}: {len(result.findings)} findings ({counts}), "
+        f"{result.suppressed} suppressed by baseline, ~${result.wasted_monthly_usd}/month of waste"
+    )
     for e in result.errors:
         out.append(f"warning: {e.check_id} in {e.region} could not run: {e.error}")
     return "\n".join(out)
@@ -48,7 +53,11 @@ def to_json(result: ScanResult) -> str:
             "tool": {"name": "cloudaudit", "version": __version__},
             "account_id": result.account_id,
             "regions": result.regions,
-            "summary": {**_summary_counts(result), "suppressed": result.suppressed, "wasted_monthly_usd": result.wasted_monthly_usd},
+            "summary": {
+                **_summary_counts(result),
+                "suppressed": result.suppressed,
+                "wasted_monthly_usd": result.wasted_monthly_usd,
+            },
             "findings": [f.to_dict() for f in result.sorted_findings()],
             "errors": [e.__dict__ for e in result.errors],
         },
@@ -73,11 +82,19 @@ def markdown(result: ScanResult) -> str:
     ]
     esc = lambda s: str(s).replace("|", "\\|")  # noqa: E731
     for f in result.sorted_findings():
-        lines.append(f"| {f.severity.name} | {f.check_id} | {f.region} | `{esc(f.resource)}` | {esc(f.detail)} | {esc(f.remediation)} |")
+        lines.append(
+            f"| {f.severity.name} | {f.check_id} | {f.region} | `{esc(f.resource)}` | {esc(f.detail)} | {esc(f.remediation)} |"
+        )
     return "\n".join(lines) + "\n"
 
 
-_SARIF_LEVEL = {Severity.CRITICAL: "error", Severity.HIGH: "error", Severity.MEDIUM: "warning", Severity.LOW: "note", Severity.INFO: "note"}
+_SARIF_LEVEL = {
+    Severity.CRITICAL: "error",
+    Severity.HIGH: "error",
+    Severity.MEDIUM: "warning",
+    Severity.LOW: "note",
+    Severity.INFO: "note",
+}
 
 
 def sarif(result: ScanResult) -> str:

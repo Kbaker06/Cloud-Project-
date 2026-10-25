@@ -3,9 +3,15 @@ from conftest import REGION, run
 
 def _db(rds, name, **kw):
     params = dict(
-        DBInstanceIdentifier=name, Engine="postgres", DBInstanceClass="db.t4g.micro",
-        MasterUsername="admin", MasterUserPassword="password123", AllocatedStorage=20,
-        StorageEncrypted=True, PubliclyAccessible=False, BackupRetentionPeriod=7,
+        DBInstanceIdentifier=name,
+        Engine="postgres",
+        DBInstanceClass="db.t4g.micro",
+        MasterUsername="admin",
+        MasterUserPassword="password123",
+        AllocatedStorage=20,
+        StorageEncrypted=True,
+        PubliclyAccessible=False,
+        BackupRetentionPeriod=7,
     )
     params.update(kw)
     return rds.create_db_instance(**params)["DBInstance"]["DBInstanceArn"]

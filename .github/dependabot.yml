@@ -1,0 +1,25 @@
+# Keeps every pinned SHA and dependency current, with one grouped PR per ecosystem each week.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: gomod
+    directory: /02-k8s-platform/app
+    schedule: { interval: weekly }
+    groups:
+      go: { patterns: ["*"] }
+  - package-ecosystem: docker
+    directory: /02-k8s-platform/app
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /05-cloud-security-auditor
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /03-serverless-event-pipeline
+    schedule: { interval: weekly }
+  - package-ecosystem: terraform
+    directories: ["/01-terraform-aws-foundation/envs/*", "/03-serverless-event-pipeline/terraform"]
+    schedule: { interval: weekly }

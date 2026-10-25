@@ -21,7 +21,9 @@ def _run_one(ctx: Context, chk: Check, region: str) -> tuple[list[Finding], Chec
         return [], CheckError(chk.id, region, str(e))
 
 
-def scan(ctx: Context, checks: list[Check], regions: list[str], baseline: set[str] | None = None, workers: int = 16) -> ScanResult:
+def scan(
+    ctx: Context, checks: list[Check], regions: list[str], baseline: set[str] | None = None, workers: int = 16
+) -> ScanResult:
     result = ScanResult(account_id=ctx.account_id(), regions=regions)
     jobs = [(c, "global") for c in checks if c.global_] + [(c, r) for c in checks if not c.global_ for r in regions]
 

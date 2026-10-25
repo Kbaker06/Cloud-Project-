@@ -1,0 +1,31 @@
+# Every exception needs a reason a reviewer can disagree with. "It was failing CI" is not a reason.
+misconfigurations:
+  - id: AWS-0053
+    paths: ["01-terraform-aws-foundation/modules/alb/main.tf"]
+    statement: The ALB is the public entry point by design. Tasks and the DB stay private.
+
+  - id: AWS-0054
+    paths: ["01-terraform-aws-foundation/modules/alb/main.tf"]
+    statement: >-
+      The port-80 listener 301-redirects to HTTPS whenever certificate_arn is set, and prod requires it.
+      Dev without a domain serves HTTP on purpose.
+
+  - id: AWS-0104
+    paths: ["01-terraform-aws-foundation/modules/ecs-service/main.tf"]
+    statement: >-
+      Egress is TCP 443 only, needed for ECR/AWS APIs through NAT. Stretch goal in 01/README: replace it
+      with VPC interface endpoints and drop this rule.
+
+  - id: AWS-0132
+    paths: ["01-terraform-aws-foundation/bootstrap/main.tf"]
+    statement: >-
+      The state bucket uses SSE-KMS with the AWS-managed key. A CMK adds cross-account key control we
+      don't need for a single-account lab.
+
+  - id: KSV-0014
+    paths: ["02-k8s-platform/policies/test-bad-pod.yaml"]
+    statement: Intentionally non-compliant fixture used to demonstrate Kyverno rejecting it.
+
+  - id: KSV-0118
+    paths: ["02-k8s-platform/policies/test-bad-pod.yaml"]
+    statement: Intentionally non-compliant fixture used to demonstrate Kyverno rejecting it.

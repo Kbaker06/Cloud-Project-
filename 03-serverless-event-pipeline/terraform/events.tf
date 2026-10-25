@@ -95,7 +95,7 @@ resource "aws_pipes_pipe" "order_events" {
 # ---------------------------------------------------------------------------
 resource "aws_sns_topic" "fraud_review" {
   name              = "${var.name}-fraud-review"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = aws_kms_key.sns.arn
 }
 
 resource "aws_sns_topic_subscription" "fraud_review_email" {

@@ -39,3 +39,4 @@ coverage.out
 # Lock files here were generated from a single-platform mirror. In your own fork,
 # run `terraform providers lock -platform=linux_amd64 -platform=darwin_arm64` and commit them.
 .terraform.lock.hcl
+.ruff_cache/

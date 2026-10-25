@@ -38,6 +38,12 @@ variable "github_repository" {
   default = null
 }
 
+variable "create_github_oidc_provider" {
+  description = "The GitHub OIDC provider is one per account. bootstrap/ creates it when given github_repository; only set true if it didn't."
+  type        = bool
+  default     = false
+}
+
 variable "app_image" {
   type    = string
   default = "ghcr.io/kbaker06/pulse-api:0.1.0"
@@ -70,11 +76,10 @@ module "stack" {
   db_multi_az            = true
   db_deletion_protection = true
 
-  certificate_arn = var.certificate_arn
-  alarm_email     = var.alarm_email
-  # The OIDC provider is per-account; dev already created it if both share an account.
+  certificate_arn             = var.certificate_arn
+  alarm_email                 = var.alarm_email
   github_repository           = var.github_repository
-  create_github_oidc_provider = false
+  create_github_oidc_provider = var.create_github_oidc_provider
 }
 
 output "stack" {

@@ -1,0 +1,42 @@
+# Nightly: run project 05's cloudaudit against the AWS account with a read-only SecurityAudit role,
+# publish findings to the Security tab (SARIF) and a readable summary to the run page.
+name: cloud-audit
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # off the hour: everyone else's cron runs at :00
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: vars.AWS_AUDIT_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: pip install ./05-cloud-security-auditor
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_AUDIT_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gha-audit-${{ github.run_id }}
+      - name: scan
+        run: |
+          cloudaudit scan --regions all --format sarif -o cloudaudit.sarif --fail-on never
+          cloudaudit scan --regions all --format markdown -o summary.md --fail-on never
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: cloudaudit.sarif
+          category: cloudaudit

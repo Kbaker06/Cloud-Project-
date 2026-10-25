@@ -1,0 +1,6 @@
+# Shared Trivy settings for CI and local runs:  trivy config --config trivy.yaml .
+severity:
+  - HIGH
+  - CRITICAL
+exit-code: 1
+ignorefile: .trivyignore.yaml

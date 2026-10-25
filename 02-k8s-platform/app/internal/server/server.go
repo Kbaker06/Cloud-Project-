@@ -16,6 +16,7 @@ import (
 	"github.com/kbaker06/cloud-project/pulse-api/internal/chaos"
 	"github.com/kbaker06/cloud-project/pulse-api/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -46,8 +47,8 @@ func New(opts Options) *Server {
 	if opts.Registry == nil {
 		opts.Registry = prometheus.NewRegistry()
 		opts.Registry.MustRegister(
-			prometheus.NewGoCollector(),
-			prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
+			collectors.NewGoCollector(),
+			collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 		)
 	}
 	s := &Server{

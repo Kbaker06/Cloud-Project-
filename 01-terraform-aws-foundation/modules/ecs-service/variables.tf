@@ -108,6 +108,12 @@ variable "secrets" {
   default     = {}
 }
 
+variable "egress_ports_in_vpc" {
+  description = "TCP ports the tasks may reach inside the VPC (e.g. 5432 for Postgres)."
+  type        = list(number)
+  default     = [5432]
+}
+
 variable "log_retention_days" {
   type    = number
   default = 30

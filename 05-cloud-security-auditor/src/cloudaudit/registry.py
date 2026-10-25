@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import fnmatch
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable, Iterable
 
 import boto3
 
@@ -18,7 +18,7 @@ class Check:
     service: str
     title: str
     global_: bool  # IAM, S3 bucket listing etc. are global: run once, not per region
-    fn: Callable[["Context", str], Iterable[Finding]]
+    fn: Callable[[Context, str], Iterable[Finding]]
 
 
 _REGISTRY: dict[str, Check] = {}

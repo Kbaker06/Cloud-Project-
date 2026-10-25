@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fire orders at the deployed API — including retries and high-value orders — to exercise the pipeline.
 
-    python3 scripts/send_orders.py --url "$(terraform -chdir=terraform output -raw api_url)" -n 200 -c 20
-    python3 scripts/send_orders.py --poison 5 --queue-url "$(terraform -chdir=terraform output -raw queue_url)"
+python3 scripts/send_orders.py --url "$(terraform -chdir=terraform output -raw api_url)" -n 200 -c 20
+python3 scripts/send_orders.py --poison 5 --queue-url "$(terraform -chdir=terraform output -raw queue_url)"
 """
 
 from __future__ import annotations

@@ -19,10 +19,15 @@ def unattached_volumes(ctx: Context, region: str):
         for vol in page["Volumes"]:
             cost = round(vol["Size"] * EBS_USD_PER_GB_MONTH.get(vol.get("VolumeType", "gp2"), 0.10), 2)
             yield Finding(
-                "COST-001", "Unattached EBS volume", Severity.LOW, vol["VolumeId"], region,
+                "COST-001",
+                "Unattached EBS volume",
+                Severity.LOW,
+                vol["VolumeId"],
+                region,
                 f"{vol['Size']} GiB {vol.get('VolumeType')} volume attached to nothing (~${cost}/month).",
                 f"Snapshot it if you need the data, then: aws ec2 delete-volume --volume-id {vol['VolumeId']} --region {region}",
-                category="cost", monthly_cost_usd=cost,
+                category="cost",
+                monthly_cost_usd=cost,
             )
 
 
@@ -32,10 +37,15 @@ def idle_eips(ctx: Context, region: str):
         if not addr.get("AssociationId"):
             cost = round(EIP_USD_PER_HOUR * 730, 2)
             yield Finding(
-                "COST-002", "Unassociated Elastic IP", Severity.LOW, addr.get("AllocationId", addr.get("PublicIp")), region,
+                "COST-002",
+                "Unassociated Elastic IP",
+                Severity.LOW,
+                addr.get("AllocationId", addr.get("PublicIp")),
+                region,
                 f"{addr.get('PublicIp')} is reserved but unused (~${cost}/month; all public IPv4 is billed since Feb 2024).",
                 f"aws ec2 release-address --allocation-id {addr.get('AllocationId')} --region {region}",
-                category="cost", monthly_cost_usd=cost,
+                category="cost",
+                monthly_cost_usd=cost,
             )
 
 
@@ -49,8 +59,13 @@ def old_snapshots(ctx: Context, region: str):
                 # Snapshots are incremental, so VolumeSize is an upper bound on the billed size.
                 cost = round(snap.get("VolumeSize", 0) * SNAPSHOT_USD_PER_GB_MONTH, 2)
                 yield Finding(
-                    "COST-003", f"EBS snapshot older than {OLD_SNAPSHOT_DAYS} days", Severity.INFO, snap["SnapshotId"], region,
+                    "COST-003",
+                    f"EBS snapshot older than {OLD_SNAPSHOT_DAYS} days",
+                    Severity.INFO,
+                    snap["SnapshotId"],
+                    region,
                     f"{age} days old, up to {snap.get('VolumeSize')} GiB (≤ ${cost}/month).",
                     "Adopt AWS Data Lifecycle Manager or AWS Backup policies instead of manual snapshots.",
-                    category="cost", monthly_cost_usd=cost,
+                    category="cost",
+                    monthly_cost_usd=cost,
                 )

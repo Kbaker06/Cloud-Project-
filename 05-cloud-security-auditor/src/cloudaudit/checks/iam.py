@@ -26,7 +26,11 @@ def root_access_keys(ctx: Context, _region: str):
     summary = _iam(ctx).get_account_summary()["SummaryMap"]
     if summary.get("AccountAccessKeysPresent", 0):
         yield Finding(
-            "IAM-001", "Root account has access keys", Severity.CRITICAL, "root", GLOBAL,
+            "IAM-001",
+            "Root account has access keys",
+            Severity.CRITICAL,
+            "root",
+            GLOBAL,
             "Root access keys cannot be scoped down by any policy and bypass SCP-less guardrails.",
             "Sign in as root → Security credentials → delete the access keys. Use IAM Identity Center for humans.",
         )
@@ -36,7 +40,11 @@ def root_access_keys(ctx: Context, _region: str):
 def root_mfa(ctx: Context, _region: str):
     if not _iam(ctx).get_account_summary()["SummaryMap"].get("AccountMFAEnabled", 0):
         yield Finding(
-            "IAM-002", "Root account has no MFA", Severity.CRITICAL, "root", GLOBAL,
+            "IAM-002",
+            "Root account has no MFA",
+            Severity.CRITICAL,
+            "root",
+            GLOBAL,
             "Anyone with the root password owns the account.",
             "Enable a hardware or passkey MFA device on the root user today.",
         )
@@ -54,7 +62,11 @@ def users_without_mfa(ctx: Context, _region: str):
             raise
         if not iam.list_mfa_devices(UserName=user["UserName"])["MFADevices"]:
             yield Finding(
-                "IAM-003", "Console user without MFA", Severity.HIGH, user["Arn"], GLOBAL,
+                "IAM-003",
+                "Console user without MFA",
+                Severity.HIGH,
+                user["Arn"],
+                GLOBAL,
                 f"{user['UserName']} can sign in to the console with only a password.",
                 "Enforce MFA (or move humans to IAM Identity Center and delete the IAM user).",
             )
@@ -70,8 +82,11 @@ def stale_access_keys(ctx: Context, _region: str):
             age = (ctx.now - key["CreateDate"]).days
             if age > MAX_KEY_AGE_DAYS:
                 yield Finding(
-                    "IAM-004", f"Active access key older than {MAX_KEY_AGE_DAYS} days", Severity.MEDIUM,
-                    f"{user['Arn']}/{key['AccessKeyId']}", GLOBAL,
+                    "IAM-004",
+                    f"Active access key older than {MAX_KEY_AGE_DAYS} days",
+                    Severity.MEDIUM,
+                    f"{user['Arn']}/{key['AccessKeyId']}",
+                    GLOBAL,
                     f"Key is {age} days old. Long-lived keys are the #1 source of leaked AWS credentials.",
                     "Rotate it — better, replace it with a role (OIDC for CI, instance/task roles for workloads).",
                 )
@@ -100,8 +115,13 @@ def admin_policies(ctx: Context, _region: str):
             doc = iam.get_policy_version(PolicyArn=pol["Arn"], VersionId=pol["DefaultVersionId"])["PolicyVersion"]["Document"]
             if any(_is_admin(s) for s in _statements(doc)):
                 yield Finding(
-                    "IAM-005", "Customer-managed policy grants full admin (*:*)", Severity.HIGH, pol["Arn"], GLOBAL,
-                    f"{pol['PolicyName']} allows Action '*' on Resource '*' and is attached to {pol.get('AttachmentCount', '?')} principal(s).",
+                    "IAM-005",
+                    "Customer-managed policy grants full admin (*:*)",
+                    Severity.HIGH,
+                    pol["Arn"],
+                    GLOBAL,
+                    f"{pol['PolicyName']} allows Action '*' on Resource '*' and is attached to "
+                    f"{pol.get('AttachmentCount', '?')} principal(s).",
                     "Replace with least-privilege policies. Use IAM Access Analyzer policy generation from CloudTrail activity.",
                 )
 
@@ -124,7 +144,11 @@ def password_policy(ctx: Context, _region: str):
             problems.append("password reuse allowed")
     if problems:
         yield Finding(
-            "IAM-006", "Weak or missing account password policy", Severity.LOW, "account-password-policy", GLOBAL,
+            "IAM-006",
+            "Weak or missing account password policy",
+            Severity.LOW,
+            "account-password-policy",
+            GLOBAL,
             "; ".join(problems),
             "aws iam update-account-password-policy --minimum-password-length 14 --password-reuse-prevention 24 "
             "--require-symbols --require-numbers --require-uppercase-characters --require-lowercase-characters",

@@ -1,6 +1,27 @@
 resource "aws_sns_topic" "alarms" {
   name              = "${var.name}-alarms"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = aws_kms_key.sns.arn
+}
+
+data "aws_iam_policy_document" "alarms_topic" {
+  statement {
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.alarms.arn]
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "alarms" {
+  arn    = aws_sns_topic.alarms.arn
+  policy = data.aws_iam_policy_document.alarms_topic.json
 }
 
 resource "aws_sns_topic_subscription" "alarms_email" {

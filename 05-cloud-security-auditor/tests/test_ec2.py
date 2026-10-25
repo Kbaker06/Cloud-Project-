@@ -14,7 +14,11 @@ def _sg(ec2, name, perms):
     "perm,severity,expect",
     [
         ({"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}, "CRITICAL", "22/SSH"),
-        ({"IpProtocol": "tcp", "FromPort": 5432, "ToPort": 5432, "Ipv6Ranges": [{"CidrIpv6": "::/0"}]}, "HIGH", "5432/PostgreSQL"),
+        (
+            {"IpProtocol": "tcp", "FromPort": 5432, "ToPort": 5432, "Ipv6Ranges": [{"CidrIpv6": "::/0"}]},
+            "HIGH",
+            "5432/PostgreSQL",
+        ),
         ({"IpProtocol": "tcp", "FromPort": 3000, "ToPort": 7000, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}, "CRITICAL", "3389/RDP"),
         ({"IpProtocol": "-1", "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}, "CRITICAL", "ALL TRAFFIC"),
     ],

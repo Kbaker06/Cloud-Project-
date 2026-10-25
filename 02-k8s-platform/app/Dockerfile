@@ -2,7 +2,7 @@
 # Multi-stage, multi-arch build. Final image: ~18 MB, no shell, no package manager, runs as UID 65532.
 #   docker buildx build --platform linux/amd64,linux/arm64 -t pulse-api:dev .
 
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 WORKDIR /src
 
 # Dependencies first so this layer is cached until go.mod/go.sum change.
