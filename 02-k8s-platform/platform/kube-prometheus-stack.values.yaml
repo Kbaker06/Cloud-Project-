@@ -1,0 +1,27 @@
+# Lean kube-prometheus-stack for a laptop cluster.
+grafana:
+  adminPassword: admin # local only — change it anywhere else
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts: [grafana.127.0.0.1.nip.io]
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    # Pick up ServiceMonitors/PrometheusRules from every namespace, not just this release's.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        memory: 400Mi
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        memory: 64Mi
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false

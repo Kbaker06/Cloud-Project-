@@ -1,0 +1,17 @@
+# Overlay for production-like clusters: helm upgrade -f values.yaml -f values-prod.yaml
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 30
+podDisruptionBudget:
+  minAvailable: 2
+resources:
+  requests:
+    cpu: 200m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+ingress:
+  host: pulse.example.com
+  tls: true
+serviceMonitor:
+  enabled: true

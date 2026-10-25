@@ -1,0 +1,36 @@
+# GitOps: Argo CD watches this repo and makes the cluster match it. To deploy, merge a PR.
+# Apply once:  kubectl apply -n argocd -f platform/argocd-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pulse-api
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kbaker06/Cloud-Project-.git
+    targetRevision: main
+    path: 02-k8s-platform/charts/pulse-api
+    helm:
+      valueFiles:
+        - values.yaml
+      parameters:
+        - name: serviceMonitor.enabled
+          value: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pulse
+  syncPolicy:
+    automated:
+      prune: true    # delete what was removed from git
+      selfHeal: true # revert manual kubectl edits (try it!)
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

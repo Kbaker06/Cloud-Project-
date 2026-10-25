@@ -1,0 +1,10 @@
+# Should be REJECTED by the policies above:  kubectl apply -f policies/test-bad-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: should-be-blocked
+  namespace: pulse
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest

@@ -1,0 +1,37 @@
+# Alerts evaluated by kube-prometheus-stack. Project 06 builds the full SLO burn-rate version.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pulse-api
+  namespace: pulse
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: pulse-api.k8s
+      rules:
+        - alert: PulseHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="pulse",code=~"5.."}[5m]))
+              / sum(rate(http_requests_total{namespace="pulse"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "pulse-api 5xx rate above 5% for 5 minutes"
+            runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/high-error-rate.md
+        - alert: PulsePodsCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace="pulse"}[15m]) > 3
+          labels:
+            severity: ticket
+          annotations:
+            summary: "{{ $labels.pod }} restarted more than 3 times in 15 minutes"
+        - alert: PulseHPAMaxedOut
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="pulse"}
+              >= kube_horizontalpodautoscaler_spec_max_replicas{namespace="pulse"}
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "HPA {{ $labels.horizontalpodautoscaler }} pinned at max replicas — capacity needs review"

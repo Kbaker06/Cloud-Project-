@@ -1,0 +1,88 @@
+# Admission policies: the cluster refuses workloads that violate these, no matter who applies them.
+# Install Kyverno (make platform) then: kubectl apply -f policies/
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/description: >-
+      ":latest" is not a version. It makes rollbacks impossible and deploys non-reproducible.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-image-tag
+      match: &not-system
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchExpressions:
+                  - key: kubernetes.io/metadata.name
+                    operator: NotIn
+                    values: [kube-system, kyverno]
+      validate:
+        message: "Images must specify a tag or digest."
+        pattern:
+          spec:
+            containers:
+              - image: "*:*"
+    - name: forbid-latest
+      match: *not-system
+      validate:
+        message: "':latest' is not allowed; pin a version or digest."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-requests-and-memory-limit
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-resources
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [pulse]
+      validate:
+        message: "CPU/memory requests and a memory limit are required (the scheduler and OOM-killer depend on them)."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+                  limits:
+                    memory: "?*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-restricted-security-context
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: non-root-readonly-no-escalation
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [pulse]
+      validate:
+        message: "Containers must run as non-root, with a read-only root filesystem and no privilege escalation."
+        pattern:
+          spec:
+            securityContext:
+              runAsNonRoot: true
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true

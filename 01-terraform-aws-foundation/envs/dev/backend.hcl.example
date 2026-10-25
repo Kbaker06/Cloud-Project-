@@ -1,0 +1,5 @@
+# cp backend.hcl.example backend.hcl, then fill in the bucket from `terraform output` in bootstrap/.
+bucket       = "tfstate-123456789012-us-east-1"
+region       = "us-east-1"
+use_lockfile = true
+encrypt      = true

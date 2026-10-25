@@ -1,0 +1,31 @@
+# 1 control plane + 3 workers, each labelled with a fake zone so topologySpreadConstraints,
+# PDBs and zone-failure drills behave like a real multi-AZ cluster.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: cloudlab
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+      - containerPort: 443
+        hostPort: 443
+  - role: worker
+    labels:
+      topology.kubernetes.io/zone: zone-a
+  - role: worker
+    labels:
+      topology.kubernetes.io/zone: zone-b
+  - role: worker
+    labels:
+      topology.kubernetes.io/zone: zone-c
+networking:
+  # kindnet doesn't enforce NetworkPolicy; disable it and install Calico (make cluster does this).
+  disableDefaultCNI: true
+  podSubnet: 192.168.0.0/16

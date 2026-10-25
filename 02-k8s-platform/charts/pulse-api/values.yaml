@@ -1,0 +1,72 @@
+image:
+  repository: ghcr.io/kbaker06/pulse-api
+  # Prefer a digest in prod (tag: "" and digest: sha256:...). Kyverno blocks :latest.
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# Rolling update that never drops below desired capacity.
+strategy:
+  maxSurge: 25%
+  maxUnavailable: 0
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    # No CPU limit on purpose: CFS throttling hurts latency more than noisy neighbours hurt us.
+    # Memory limit stays — it's the one that protects the node.
+    memory: 128Mi
+
+env:
+  SHUTDOWN_DRAIN_SECONDS: "5"
+
+# Name of an existing Secret with key ADMIN_TOKEN (enables /admin/chaos). Empty = chaos disabled.
+adminTokenSecret: ""
+
+terminationGracePeriodSeconds: 30
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: pulse.127.0.0.1.nip.io
+  tls: false
+
+networkPolicy:
+  enabled: true
+  # Namespaces allowed to reach the pods (ingress controller + Prometheus).
+  ingressNamespaces:
+    - ingress-nginx
+    - monitoring
+  # Lets pods in the release namespace (e.g. `make load`) call the service.
+  allowSameNamespace: true
+
+serviceMonitor:
+  enabled: false # requires the Prometheus Operator CRDs (installed by `make platform`)
+  interval: 15s
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # e.g. eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/pulse-api (IRSA)
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []

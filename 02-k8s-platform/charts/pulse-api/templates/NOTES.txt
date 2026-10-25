@@ -1,0 +1,11 @@
+pulse-api {{ .Values.image.tag | default .Chart.AppVersion }} deployed as {{ include "pulse.fullname" . }}.
+{{- if .Values.ingress.enabled }}
+
+  curl http://{{ .Values.ingress.host }}/healthz
+{{- else }}
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "pulse.fullname" . }} 8080:{{ .Values.service.port }}
+  curl localhost:8080/healthz
+{{- end }}
+
+Watch autoscaling:  kubectl -n {{ .Release.Namespace }} get hpa -w
