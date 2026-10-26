@@ -153,6 +153,34 @@ jobs:
       - run: opa test 04-devsecops-pipeline/policy -v
 
   # ---------------------------------------------------------------------------
+  sre:
+    name: prometheus rules + alert unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 06-sre-observability
+    env:
+      PROMETHEUS_VERSION: "3.15.1"
+      ALERTMANAGER_VERSION: "0.34.1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: install promtool + amtool
+        run: |
+          curl -sSfL "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" \
+            | sudo tar xz -C /usr/local/bin --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+          curl -sSfL "https://github.com/prometheus/alertmanager/releases/download/v${ALERTMANAGER_VERSION}/alertmanager-${ALERTMANAGER_VERSION}.linux-amd64.tar.gz" \
+            | sudo tar xz -C /usr/local/bin --strip-components=1 "alertmanager-${ALERTMANAGER_VERSION}.linux-amd64/amtool"
+      - run: promtool check rules prometheus/rules/*.yml
+      - run: promtool test rules prometheus/tests/*.yml
+      - run: amtool check-config alertmanager/alertmanager.yml
+      - name: dashboards are valid JSON
+        run: for f in grafana/dashboards/*.json; do python3 -m json.tool "$f" > /dev/null && echo "ok $f"; done
+      - run: docker compose config --quiet
+      - run: bash -n chaos/chaos.sh
+
+  # ---------------------------------------------------------------------------
   iac-scan:
     name: trivy · IaC misconfigurations
     runs-on: ubuntu-latest

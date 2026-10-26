@@ -1,0 +1,116 @@
+# SLOs for pulse-api, implemented the Google SRE Workbook way:
+# recording rules for the SLI at several windows, then multi-window, multi-burn-rate alerts.
+#
+#   Availability SLO: 99.9% of requests succeed (non-5xx) over 30 days → error budget 0.1%
+#   Latency SLO:      99% of requests complete in < 300 ms over 30 days → error budget 1%
+#                     (excludes /api/v1/work, a synthetic CPU-burn endpoint)
+#
+# A burn rate of 1 spends exactly the 30-day budget in 30 days. 14.4 spends 2% of it in 1 hour.
+groups:
+  - name: pulse-api-sli-availability
+    interval: 30s
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[5m])) / sum(rate(http_requests_total{job="pulse-api"}[5m]))
+      - record: slo:sli_error:ratio_rate30m
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[30m])) / sum(rate(http_requests_total{job="pulse-api"}[30m]))
+      - record: slo:sli_error:ratio_rate1h
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[1h])) / sum(rate(http_requests_total{job="pulse-api"}[1h]))
+      - record: slo:sli_error:ratio_rate2h
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[2h])) / sum(rate(http_requests_total{job="pulse-api"}[2h]))
+      - record: slo:sli_error:ratio_rate6h
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[6h])) / sum(rate(http_requests_total{job="pulse-api"}[6h]))
+      - record: slo:sli_error:ratio_rate1d
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[1d])) / sum(rate(http_requests_total{job="pulse-api"}[1d]))
+      - record: slo:sli_error:ratio_rate3d
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[3d])) / sum(rate(http_requests_total{job="pulse-api"}[3d]))
+      - record: slo:sli_error:ratio_rate30d
+        expr: sum(rate(http_requests_total{job="pulse-api",code=~"5.."}[30d])) / sum(rate(http_requests_total{job="pulse-api"}[30d]))
+      # 1 = untouched budget, 0 = spent, negative = SLO breached.
+      - record: slo:error_budget_remaining:ratio
+        expr: 1 - (slo:sli_error:ratio_rate30d / 0.001)
+
+  - name: pulse-api-sli-latency
+    interval: 30s
+    rules:
+      - record: slo:sli_latency:ratio_rate5m
+        expr: |
+          1 - sum(rate(http_request_duration_seconds_bucket{job="pulse-api",route!="/api/v1/work",le="0.3"}[5m]))
+            / sum(rate(http_request_duration_seconds_count{job="pulse-api",route!="/api/v1/work"}[5m]))
+      - record: slo:sli_latency:ratio_rate30m
+        expr: |
+          1 - sum(rate(http_request_duration_seconds_bucket{job="pulse-api",route!="/api/v1/work",le="0.3"}[30m]))
+            / sum(rate(http_request_duration_seconds_count{job="pulse-api",route!="/api/v1/work"}[30m]))
+      - record: slo:sli_latency:ratio_rate1h
+        expr: |
+          1 - sum(rate(http_request_duration_seconds_bucket{job="pulse-api",route!="/api/v1/work",le="0.3"}[1h]))
+            / sum(rate(http_request_duration_seconds_count{job="pulse-api",route!="/api/v1/work"}[1h]))
+      - record: slo:sli_latency:ratio_rate6h
+        expr: |
+          1 - sum(rate(http_request_duration_seconds_bucket{job="pulse-api",route!="/api/v1/work",le="0.3"}[6h]))
+            / sum(rate(http_request_duration_seconds_count{job="pulse-api",route!="/api/v1/work"}[6h]))
+
+  - name: pulse-api-slo-alerts
+    rules:
+      # ---- Availability -------------------------------------------------------
+      # Fast burn: 2% of the monthly budget in 1h, or 5% in 6h. Someone gets woken up.
+      # The short window (5m / 30m) makes the alert resolve quickly once the bleeding stops.
+      - alert: PulseErrorBudgetBurnFast
+        expr: |
+          (slo:sli_error:ratio_rate1h > (14.4 * 0.001) and slo:sli_error:ratio_rate5m > (14.4 * 0.001))
+          or
+          (slo:sli_error:ratio_rate6h > (6 * 0.001) and slo:sli_error:ratio_rate30m > (6 * 0.001))
+        for: 2m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: "pulse-api is burning its availability error budget fast"
+          runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/high-error-rate.md
+
+      # Slow burn: 10% of budget in 3 days. A ticket for business hours, not a page.
+      - alert: PulseErrorBudgetBurnSlow
+        expr: |
+          (slo:sli_error:ratio_rate1d > (3 * 0.001) and slo:sli_error:ratio_rate2h > (3 * 0.001))
+          or
+          (slo:sli_error:ratio_rate3d > 0.001 and slo:sli_error:ratio_rate6h > 0.001)
+        for: 15m
+        labels:
+          severity: ticket
+          slo: availability
+        annotations:
+          summary: "pulse-api is slowly eroding its availability error budget"
+          runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/slo-burn-rate.md
+
+      # ---- Latency --------------------------------------------------------------
+      - alert: PulseLatencyBudgetBurnFast
+        expr: |
+          (slo:sli_latency:ratio_rate1h > (14.4 * 0.01) and slo:sli_latency:ratio_rate5m > (14.4 * 0.01))
+          or
+          (slo:sli_latency:ratio_rate6h > (6 * 0.01) and slo:sli_latency:ratio_rate30m > (6 * 0.01))
+        for: 2m
+        labels:
+          severity: page
+          slo: latency
+        annotations:
+          summary: "pulse-api requests are too slow: latency budget burning fast"
+          runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/high-latency.md
+
+      # ---- Symptoms that SLOs alone would catch too late ------------------------
+      - alert: PulseInstanceDown
+        expr: up{job="pulse-api"} == 0
+        for: 1m
+        labels:
+          severity: ticket # the other replica absorbs traffic; the SLO alerts page if it can't
+        annotations:
+          summary: "{{ $labels.instance }} is down"
+          runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/instance-down.md
+
+      - alert: PulseAllInstancesDown
+        expr: sum(up{job="pulse-api"}) == 0 or absent(up{job="pulse-api"})
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: "Every pulse-api instance is down (or not being scraped)"
+          runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/instance-down.md

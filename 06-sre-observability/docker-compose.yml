@@ -1,0 +1,76 @@
+# Game-day lab: two pulse-api replicas + Prometheus + Alertmanager + Grafana + a fake pager + k6.
+#   docker compose up -d --build && docker compose run --rm k6
+# Grafana: http://localhost:3000 (anonymous admin)   Prometheus: http://localhost:9090
+# Alertmanager: http://localhost:9093                Pager output: docker compose logs -f pager
+name: gameday
+
+x-api: &api
+  build:
+    context: ../02-k8s-platform/app
+    args:
+      VERSION: gameday
+  environment:
+    ADMIN_TOKEN: ${ADMIN_TOKEN:-gameday-token}
+    SHUTDOWN_DRAIN_SECONDS: "2"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 128M
+
+services:
+  api-1:
+    <<: *api
+    ports: ["8081:8080"]
+  api-2:
+    <<: *api
+    ports: ["8082:8080"]
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle # POST /-/reload after editing rules
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports: ["9090:9090"]
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports: ["9093:9093"]
+
+  pager:
+    image: python:3.13-alpine
+    command: ["python", "-u", "/pager.py"]
+    volumes:
+      - ./pager/pager.py:/pager.py:ro
+
+  grafana:
+    image: grafana/grafana:13.2.4
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin # local lab only!
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/pulse-slo.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: [load] # not started by `up`; run with `docker compose run --rm k6`
+    command: ["run", "/scripts/load.js"]
+    volumes:
+      - ./k6:/scripts:ro
+
+volumes:
+  prometheus-data:

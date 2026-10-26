@@ -1,0 +1,29 @@
+# Routing: pages go to the on-call "pager", tickets to the ticket queue.
+# In real life: receivers would be PagerDuty / Opsgenie and Jira / Slack.
+route:
+  receiver: tickets
+  group_by: [alertname, slo]
+  group_wait: 30s      # batch alerts that fire together into one notification
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="page"]
+      receiver: pager
+      group_wait: 10s
+      repeat_interval: 1h
+
+# Don't open a ticket for an instance being down when we're already paging for the whole service.
+inhibit_rules:
+  - source_matchers: [severity="page"]
+    target_matchers: [severity="ticket"]
+    equal: []
+
+receivers:
+  - name: pager
+    webhook_configs:
+      - url: http://pager:8000/page
+        send_resolved: true
+  - name: tickets
+    webhook_configs:
+      - url: http://pager:8000/ticket
+        send_resolved: true

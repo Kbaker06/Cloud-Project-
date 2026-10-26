@@ -1,0 +1,138 @@
+# Unit tests for the alerting rules: promtool test rules prometheus/tests/slo_test.yml
+# Each test replays synthetic counters and asserts exactly which alerts are firing when.
+# Series notation: 'a+bxN' = start at a, add b each interval, N times.
+rule_files:
+  - ../rules/slo.yml
+
+evaluation_interval: 30s
+
+tests:
+  # ---------------------------------------------------------------------------
+  - name: healthy traffic within budget never alerts
+    interval: 1m
+    input_series:
+      # 6000 req/min, 3 errors/min = 0.05% errors (half the 0.1% budget)
+      - series: 'http_requests_total{job="pulse-api",instance="a",route="/api/v1/notes",method="GET",code="200"}'
+        values: '0+5997x400'
+      - series: 'http_requests_total{job="pulse-api",instance="a",route="/api/v1/notes",method="GET",code="500"}'
+        values: '0+3x400'
+    alert_rule_test:
+      - { eval_time: 1h, alertname: PulseErrorBudgetBurnFast, exp_alerts: [] }
+      - { eval_time: 6h, alertname: PulseErrorBudgetBurnFast, exp_alerts: [] }
+      - { eval_time: 6h, alertname: PulseErrorBudgetBurnSlow, exp_alerts: [] }
+    promql_expr_test:
+      - expr: slo:error_budget_remaining:ratio
+        eval_time: 6h
+        exp_samples:
+          - labels: slo:error_budget_remaining:ratio
+            value: 0.5
+
+  # ---------------------------------------------------------------------------
+  - name: 10% errors pages within minutes, and the alert clears once the short window is clean
+    interval: 1m
+    input_series:
+      # 1000 req/min. From minute 60 to 90, 100 of them are 5xx. Then an hour of clean traffic.
+      - series: 'http_requests_total{job="pulse-api",instance="a",route="/api/v1/notes",method="GET",code="200"}'
+        values: '0+1000x60 60000+900x30 87000+1000x60'
+      - series: 'http_requests_total{job="pulse-api",instance="a",route="/api/v1/notes",method="GET",code="500"}'
+        values: '0x60 0+100x30 3000x60'
+    alert_rule_test:
+      - eval_time: 62m # 2 minutes in: 1h window hasn't crossed 1.44% yet
+        alertname: PulseErrorBudgetBurnFast
+        exp_alerts: []
+      - eval_time: 75m # 15 minutes in: firing
+        alertname: PulseErrorBudgetBurnFast
+        exp_alerts:
+          - exp_labels: { severity: page, slo: availability }
+            exp_annotations:
+              summary: "pulse-api is burning its availability error budget fast"
+              runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/high-error-rate.md
+      # 10 minutes after recovery the 1h/5m pair has cleared, but the 6h/30m pair still holds the page:
+      # the 30m window contains 20 minutes of 10% errors. This is intended — it stops a flapping
+      # incident from paging, resolving and re-paging every few minutes.
+      - eval_time: 100m
+        alertname: PulseErrorBudgetBurnFast
+        exp_alerts:
+          - exp_labels: { severity: page, slo: availability }
+            exp_annotations:
+              summary: "pulse-api is burning its availability error budget fast"
+              runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/high-error-rate.md
+      - eval_time: 125m # ~35 minutes after recovery the 30m window is clean too: resolved
+        alertname: PulseErrorBudgetBurnFast
+        exp_alerts: []
+
+  # ---------------------------------------------------------------------------
+  - name: 0.5% errors for a day opens a ticket but never pages
+    interval: 5m
+    input_series:
+      # 5000 req per 5m, 25 errors (0.5% = 5x burn rate) for 26 hours
+      - series: 'http_requests_total{job="pulse-api",instance="a",route="/api/v1/notes",method="GET",code="200"}'
+        values: '0+4975x312'
+      - series: 'http_requests_total{job="pulse-api",instance="a",route="/api/v1/notes",method="GET",code="500"}'
+        values: '0+25x312'
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: PulseErrorBudgetBurnSlow
+        exp_alerts:
+          - exp_labels: { severity: ticket, slo: availability }
+            exp_annotations:
+              summary: "pulse-api is slowly eroding its availability error budget"
+              runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/slo-burn-rate.md
+      - eval_time: 26h
+        alertname: PulseErrorBudgetBurnFast
+        exp_alerts: []
+
+  # ---------------------------------------------------------------------------
+  - name: 20% of requests slower than 300ms pages on latency
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{job="pulse-api",instance="a",route="/api/v1/notes",method="GET",le="0.3"}'
+        values: '0+800x90'
+      - series: 'http_request_duration_seconds_count{job="pulse-api",instance="a",route="/api/v1/notes",method="GET"}'
+        values: '0+1000x90'
+      # The CPU-burn endpoint is excluded from the latency SLI: all-slow traffic there must not page.
+      - series: 'http_request_duration_seconds_bucket{job="pulse-api",instance="a",route="/api/v1/work",method="GET",le="0.3"}'
+        values: '0x90'
+      - series: 'http_request_duration_seconds_count{job="pulse-api",instance="a",route="/api/v1/work",method="GET"}'
+        values: '0+100000x90'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: PulseLatencyBudgetBurnFast
+        exp_alerts:
+          - exp_labels: { severity: page, slo: latency }
+            exp_annotations:
+              summary: "pulse-api requests are too slow: latency budget burning fast"
+              runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/high-latency.md
+    promql_expr_test:
+      - expr: round(slo:sli_latency:ratio_rate1h, 0.0001) # 20% slow — /api/v1/work excluded
+        eval_time: 80m
+        exp_samples:
+          - labels: "{}"
+            value: 0.2
+
+  # ---------------------------------------------------------------------------
+  - name: one replica down is a ticket, both down is a page
+    interval: 1m
+    input_series:
+      - series: 'up{job="pulse-api",instance="api-1:8080"}'
+        values: '1x5 0x10'
+      - series: 'up{job="pulse-api",instance="api-2:8080"}'
+        values: '1x10 0x5'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: PulseInstanceDown
+        exp_alerts:
+          - exp_labels: { severity: ticket, job: pulse-api, instance: "api-1:8080" }
+            exp_annotations:
+              summary: "api-1:8080 is down"
+              runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/instance-down.md
+      - eval_time: 8m
+        alertname: PulseAllInstancesDown
+        exp_alerts: []
+      - eval_time: 13m
+        alertname: PulseAllInstancesDown
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "Every pulse-api instance is down (or not being scraped)"
+              runbook_url: https://github.com/kbaker06/Cloud-Project-/blob/main/06-sre-observability/runbooks/instance-down.md
